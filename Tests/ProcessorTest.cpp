@@ -117,76 +117,87 @@ int main()
         SimpleDelayAudioProcessor p;
         p.setPlayConfigDetails (2, 2, 44100.0, 512);
         setParamValue (p, SimpleDelayAudioProcessor::mixID, 1.0f);       // fully wet
-        setParamValue (p, SimpleDelayAudioProcessor::feedbackID, 0.0f);  // single echo
+        setParamValue (p, SimpleDelayAudioProcessor::feedbackID, 0.0f);  // a single echo
 
         // "time" is skewed, so go through its own range rather than guessing a
         // normalised value.
         auto* timeParam = dynamic_cast<juce::AudioParameterFloat*> (p.apvts.getParameter ("time"));
         CHECK (timeParam != nullptr);
-        timeParam->setValueNotifyingHost (timeParam->range.convertTo0to1 (100.0f));
-
-        p.prepareToPlay (44100.0, 512);
+        auto setTimeMs = [timeParam] (float ms)
+        {
+            timeParam->setValueNotifyingHost (timeParam->range.convertTo0to1 (ms));
+        };
 
         juce::MidiBuffer midi;
 
-        // Let the parameter smoothers settle before measuring.
+        // Lets the parameter smoothers settle, sends one impulse, and asserts
+        // the response is nothing but the echo:
+        //   * the peak lands within +-4 samples of the expected sample delay, and
+        //   * every sample OUTSIDE that echo window is silent to 1e-6.
+        // The window is centred on the expected landing (not on the measured
+        // peak), so the silence check fails if the echo lands anywhere else or
+        // if a line that should have been freshly armed is still holding old
+        // audio. That is what pins a prepareToPlay that fails to re-arm the
+        // delay lines for a new sample rate.
+        auto measureEcho = [&] (int expectedDelaySamples, int bufferSize)
         {
-            juce::AudioBuffer<float> warm (2, 2048);
-            warm.clear();
-            p.processBlock (warm, midi);
-        }
+            // settle the smoothers at the current (possibly new) sample rate
+            {
+                juce::AudioBuffer<float> warm (2, 4096);
+                warm.clear();
+                p.processBlock (warm, midi);
+            }
 
-        // Impulse at 44.1 kHz: a 100 ms echo is 4410 samples.
-        {
-            juce::AudioBuffer<float> buf (2, 8192);
+            juce::AudioBuffer<float> buf (2, bufferSize);
             buf.clear();
             buf.setSample (0, 0, 1.0f);
             p.processBlock (buf, midi);
 
-            int peakIndex = 0;
+            int   peakIndex = 0;
             float peak = 0.0f;
+            int   nonFinite = 0;
+            float maxOutside = 0.0f;
+            const int lo = expectedDelaySamples - 4;
+            const int hi = expectedDelaySamples + 4;
+
             for (int i = 0; i < buf.getNumSamples(); ++i)
             {
-                CHECK (std::isfinite (buf.getSample (0, i)));
-                CHECK (std::isfinite (buf.getSample (1, i)));
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    const float v = buf.getSample (ch, i);
+                    if (! std::isfinite (v))
+                        ++nonFinite;
+                    if (i < lo || i > hi)
+                        maxOutside = std::max (maxOutside, std::fabs (v));
+                }
+
                 const float v = std::fabs (buf.getSample (0, i));
                 if (v > peak) { peak = v; peakIndex = i; }
             }
 
+            CHECK (nonFinite == 0);
             CHECK (peak > 0.5f);
-            CHECK (std::abs (peakIndex - 4410) <= 4);
-        }
+            CHECK (std::abs (peakIndex - expectedDelaySamples) <= 4);
+            CHECK_NEAR (maxOutside, 0.0, 1e-6);
+        };
+
+        // 100 ms at 44.1 kHz is 4410 samples.
+        p.prepareToPlay (44100.0, 512);
+        setTimeMs (100.0f);
+        measureEcho (4410, 8192);
 
         // Host calls prepareToPlay again at a different rate.
         p.prepareToPlay (96000.0, 512);
+        setTimeMs (100.0f);
+        measureEcho (9600, 12000);
 
-        // Let the smoothers settle again at the new rate.
-        {
-            juce::AudioBuffer<float> warm (2, 4096);
-            warm.clear();
-            p.processBlock (warm, midi);
-        }
-
-        // Impulse at 96 kHz: the same 100 ms is now 9600 samples.
-        {
-            juce::AudioBuffer<float> buf (2, 12000);
-            buf.clear();
-            buf.setSample (0, 0, 1.0f);
-            p.processBlock (buf, midi);
-
-            int peakIndex = 0;
-            float peak = 0.0f;
-            for (int i = 0; i < buf.getNumSamples(); ++i)
-            {
-                CHECK (std::isfinite (buf.getSample (0, i)));
-                CHECK (std::isfinite (buf.getSample (1, i)));
-                const float v = std::fabs (buf.getSample (0, i));
-                if (v > peak) { peak = v; peakIndex = i; }
-            }
-
-            CHECK (peak > 0.5f);
-            CHECK (std::abs (peakIndex - 9600) <= 4);
-        }
+        // And again at 96 kHz, now asking for a delay longer than the 44.1 kHz
+        // line could ever hold (its ceiling would be 918.75 ms). A prepareToPlay
+        // that failed to resize would clamp this to 88200 samples and the echo
+        // would not land at 144000, nor would the line be silent there.
+        p.prepareToPlay (96000.0, 512);
+        setTimeMs (1500.0f);
+        measureEcho (144000, 150000);
     }
 
     // --- state round-trip: save on one processor, restore on a fresh one ---
