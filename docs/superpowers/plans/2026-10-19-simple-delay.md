@@ -97,7 +97,10 @@ libs/
 .vs/
 *.vst3
 *.user
+.superpowers/
 ```
+
+`.superpowers/` holds the SDD workspace (ledger and task briefs). It is git-ignored scratch, so it is not part of the deliverable. `.gitignore` may already exist with exactly this content from workspace setup; if so, leave it alone.
 
 `README.md` starts minimal and Task 7 expands it. At this point it must contain: the prerequisites, the one-time JUCE clone command from Step 3 with its pinned tag, the configure and build commands from Step 9, the two artefact paths from Step 10, and both install routes described in Step 5. `CMakeLists.txt` aborts with a message pointing at this file, so a two-line stub is not enough.
 
@@ -153,7 +156,7 @@ target_link_libraries(SimpleDelay PRIVATE
 
 - [ ] **Step 6: Write `Source/PluginProcessor.h`**
 
-Declares `SimpleDelayAudioProcessor : public juce::AudioProcessor` with:
+Declares `SimpleDelayAudioProcessor : public juce::AudioProcessor`, all in the `public:` section — Tasks 5 and 6 reach these from outside the class:
 
 ```cpp
 static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -253,6 +256,7 @@ git commit -m "Add plugin scaffold with three parameters and temporary gain"
 
 **Files:**
 - Create: `Source/DelayLine.h`
+- Create: `Tests/Check.h`
 - Create: `Tests/DelayLineTest.cpp`
 - Modify: `CMakeLists.txt` (add the test target)
 
@@ -290,24 +294,40 @@ This target links neither JUCE nor anything else. That is the point: the DSP is 
 
 - [ ] **Step 2: Write the failing test**
 
-Create `Tests/DelayLineTest.cpp` with the harness and the first test. The harness must exit non-zero on any failure so the build system notices:
+Create `Tests/Check.h` — the shared harness for both test executables. It includes only the C++ standard library, never JUCE, so the delay tests keep their zero-dependency property:
 
 ```cpp
-#include "DelayLine.h"
+#pragma once
+
 #include <cmath>
 #include <cstdio>
-#include <vector>
 
-static int failures = 0, checks = 0;
+inline int gChecks = 0;
+inline int gFailures = 0;
 
-#define CHECK(cond) do { ++checks; if (!(cond)) { ++failures; \
+#define CHECK(cond) do { ++gChecks; if (!(cond)) { ++gFailures; \
     std::printf ("FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond); } } while (0)
 
-#define CHECK_NEAR(a, b, tol) do { ++checks; \
+#define CHECK_NEAR(a, b, tol) do { ++gChecks; \
     const double _a = (a), _b = (b); \
-    if (std::fabs (_a - _b) > (tol)) { ++failures; \
+    if (std::fabs (_a - _b) > (tol)) { ++gFailures; \
         std::printf ("FAIL %s:%d  %s = %.9g, expected %.9g\n", \
                      __FILE__, __LINE__, #a, _a, _b); } } while (0)
+
+inline int reportAndExit()
+{
+    std::printf ("%d checks, %d failures\n", gChecks, gFailures);
+    return gFailures == 0 ? 0 : 1;
+}
+```
+
+`inline` variables are C++17, which the project already requires. Then create `Tests/DelayLineTest.cpp`, which includes `Check.h` from the same directory (no extra include path is needed) and holds the first test:
+
+```cpp
+#include "Check.h"
+#include "DelayLine.h"
+
+#include <vector>
 
 static constexpr double kSampleRate = 48000.0;
 static constexpr float  kMaxDelayMs = 2000.0f;
@@ -336,8 +356,7 @@ int main()
         CHECK_NEAR (out[100], 1.0, 1e-6);
     }
 
-    std::printf ("%d checks, %d failures\n", checks, failures);
-    return failures == 0 ? 0 : 1;
+    return reportAndExit();
 }
 ```
 
@@ -351,7 +370,7 @@ Expected: FAILS TO COMPILE with `Cannot open include file: 'DelayLine.h'`. A com
 
 - [ ] **Step 4: Implement `Source/DelayLine.h`**
 
-Header-only, standard library only. Members: `std::vector<float> buffer`, `int bufferSize`, `int writeIndex`, `float delaySamples`, `float feedback`. All with in-class initializers so a default-constructed line is safe to `processSample` before `prepare`.
+Header-only, standard library only. Members: `std::vector<float> buffer`, `int bufferSize`, `int writeIndex`, `float delaySamples`, `float feedback`. All with in-class initializers, but note that **`prepare()` must be called before `processSample()`** — before `prepare`, `bufferSize` is 0 and the wrap modulo would divide by zero.
 
 - `prepare(sampleRate, maxDelayMs)` — allocate `bufferSize = (int) std::ceil (sampleRate * maxDelayMs / 1000.0) + 4`, fill with zeros, `writeIndex = 0`.
 - `reset()` — `std::fill` the buffer with zeros, `writeIndex = 0`.
@@ -383,7 +402,7 @@ Expected: `N checks, 0 failures`, exit code 0. Confirm the exit code with `echo 
 
 - [ ] **Step 6: Add the feedback-decay test**
 
-Appends a second block to `main()`, before the summary `printf`:
+Appends a second block to `main()`, before `return reportAndExit();`:
 
 ```cpp
     // --- feedback math produces a geometric decay, not just "several echoes" ---
@@ -785,7 +804,16 @@ set_target_properties (ProcessorTests PROPERTIES
 
 - [ ] **Step 2: Write the failing tests**
 
-`Tests/ProcessorTest.cpp` uses the same `CHECK` / `CHECK_NEAR` macro pair and the same `0 failures` exit-code convention as `DelayLineTest.cpp`. All assertions are against one shared instance per block:
+`Tests/ProcessorTest.cpp` includes `Check.h` for the same `CHECK` / `CHECK_NEAR` macros and `reportAndExit()` convention as `DelayLineTest.cpp`. Its `main()` must construct `juce::ScopedJuceInitialiser_GUI` as its first statement, before any processor is created: this binary links the GUI modules through `juce_audio_utils`, and JUCE's subsystems are not initialised otherwise. All assertions use one processor instance per block:
+
+```cpp
+int main()
+{
+    juce::ScopedJuceInitialiser_GUI juceInit;
+    ...
+    return reportAndExit();
+}
+```
 
 ```cpp
 // --- mono in, stereo out: the silent channel stays silent ---
