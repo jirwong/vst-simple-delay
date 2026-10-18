@@ -154,9 +154,12 @@ int main()
         DelayLine line;
         line.prepare (kSampleRate, kMaxDelayMs);
         line.setFeedback (0.5f);
-        for (int i = 0; i < 48000; ++i)
+        const int maxDelay = line.getBufferSize() - 4;
+        for (int i = 0; i <= maxDelay; ++i)
         {
-            line.setDelaySamples (1.0f + (float) i);     // sweep across the whole range
+            // Sweep the whole usable range [1, bufferSize - 4] and one sample
+            // beyond it, so the clamped ceiling is exercised as well.
+            line.setDelaySamples (1.0f + (float) i);
             CHECK (std::isfinite (line.processSample (0.5f)));
         }
     }

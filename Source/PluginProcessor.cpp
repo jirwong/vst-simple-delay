@@ -52,6 +52,15 @@ void SimpleDelayAudioProcessor::prepareToPlay (double sampleRate, int /*samplesP
 
     timeSmoother.reset (sampleRate, 0.02);         // 20 ms ramp
     mixSmoother.reset (sampleRate, 0.02);
+
+    // reset() keeps each smoother's current value: 0 on the first prepare, or a
+    // count still in the old sample rate after a rate change. Seed both to the
+    // current parameter values so the first block starts where it belongs
+    // instead of gliding up from the minimum / from a stale count.
+    const float timeMs = apvts.getRawParameterValue (timeID)->load();
+    const float mix    = apvts.getRawParameterValue (mixID)->load();
+    timeSmoother.setCurrentAndTargetValue (timeMs * 0.001f * (float) sampleRate);
+    mixSmoother.setCurrentAndTargetValue (mix);
 }
 
 void SimpleDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& /*midiMessages*/)
@@ -62,7 +71,9 @@ void SimpleDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     const int numOut     = getTotalNumOutputChannels();
     const int numSamples = buffer.getNumSamples();
 
-    // Channels with no input channel aliased to them hold stale data. Clear them.
+    // When there are more outputs than inputs, JUCE only guarantees that the
+    // channels corresponding to inputs hold sensible data; the extra channels
+    // may contain garbage, so clear them rather than let them pass through.
     for (int ch = numIn; ch < numOut; ++ch)
         buffer.clear (ch, 0, numSamples);
 

@@ -3,6 +3,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <algorithm>
 #include <cmath>
 
 // Sets a parameter through its own normalisable range. This matters for the
@@ -60,8 +61,11 @@ int main()
     {
         SimpleDelayAudioProcessor p;
         p.setPlayConfigDetails (2, 2, 48000.0, 512);
-        p.prepareToPlay (48000.0, 512);
+        // Set mix before prepareToPlay: prepareToPlay seeds the smoother to the
+        // parameter's value, so setting it afterwards would leave the first
+        // block ramping towards 0 instead of being dry throughout.
         setParamValue (p, SimpleDelayAudioProcessor::mixID, 0.0f);
+        p.prepareToPlay (48000.0, 512);
 
         const float constant = 0.25f;
         juce::MidiBuffer midi;
@@ -121,7 +125,7 @@ int main()
 
         // "time" is skewed, so go through its own range rather than guessing a
         // normalised value.
-        auto* timeParam = dynamic_cast<juce::AudioParameterFloat*> (p.apvts.getParameter ("time"));
+        auto* timeParam = dynamic_cast<juce::AudioParameterFloat*> (p.apvts.getParameter (SimpleDelayAudioProcessor::timeID));
         CHECK (timeParam != nullptr);
         auto setTimeMs = [timeParam] (float ms)
         {
@@ -135,10 +139,10 @@ int main()
         //   * the peak lands within +-4 samples of the expected sample delay, and
         //   * every sample OUTSIDE that echo window is silent to 1e-6.
         // The window is centred on the expected landing (not on the measured
-        // peak), so the silence check fails if the echo lands anywhere else or
-        // if a line that should have been freshly armed is still holding old
-        // audio. That is what pins a prepareToPlay that fails to re-arm the
-        // delay lines for a new sample rate.
+        // peak), so the silence check also fails if the echo lands anywhere
+        // else. The final 1500 ms phase below is what makes this load-bearing
+        // for a prepareToPlay that fails to re-arm the delay lines for a new
+        // sample rate.
         auto measureEcho = [&] (int expectedDelaySamples, int bufferSize)
         {
             // settle the smoothers at the current (possibly new) sample rate
