@@ -85,9 +85,12 @@ Expected: a list of version tags. Choose the highest `8.x.y` that contains no su
 git clone --depth 1 --branch <JUCE_TAG> --recurse-submodules --shallow-submodules https://github.com/juce-framework/JUCE.git libs/JUCE
 ```
 
-This recurse step matters: the Steinberg VST3 SDK is a git submodule, and without it VST3 builds fail with a missing-header error.
+Verify: `ls libs/JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK` is not empty.
 
-Verify: `ls libs/JUCE/modules/juce_audio_processors/format_types/VST3_SDK` is not empty.
+(The `--recurse-submodules` flag is defensive. As of JUCE 8.0.15 the Steinberg
+VST3 SDK is vendored directly in the JUCE tree — there is no `.gitmodules` at
+all — so the flag is a no-op today. It stays in the command so a future tag that
+does reintroduce a submodule still clones correctly.)
 
 - [ ] **Step 4: Write `.gitignore` and a first `README.md`**
 

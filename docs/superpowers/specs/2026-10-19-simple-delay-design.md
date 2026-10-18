@@ -145,8 +145,10 @@ processor, because it is a plugin-level decision rather than a property of a del
   acceptable at this project's size.
 - CMake installed via `winget install Kitware.CMake` so it is on `PATH`.
 - JUCE fetched **once** into `libs/JUCE`, pinned to an exact release tag, cloned
-  with its submodules (the VST3 SDK is a submodule). Pinning prevents upstream
-  changes from breaking the build.
+  with `--recurse-submodules` (defensive: JUCE 8.0.15 vendors the Steinberg VST3
+  SDK directly in-tree and has no `.gitmodules`, but the flag is harmless and
+  keeps the command correct if upstream reintroduces one). Pinning prevents
+  upstream changes from breaking the build.
 - Targets: `SimpleDelay_VST3` and `SimpleDelay_Standalone`, both from one
   `juce_add_plugin` definition.
 - Build type: Release for normal use; Debug available for stepping through DSP.
