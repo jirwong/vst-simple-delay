@@ -25,7 +25,8 @@ juce_add_plugin(SimpleDelay
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
 target_sources(SimpleDelay PRIVATE
-    Source/PluginProcessor.cpp)
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp)
 
 target_include_directories(SimpleDelay PRIVATE Source)
 
@@ -56,7 +57,8 @@ set_target_properties(DelayLineTests PROPERTIES
 juce_add_console_app(ProcessorTests PRODUCT_NAME "ProcessorTests")
 target_sources(ProcessorTests PRIVATE
     Tests/ProcessorTest.cpp
-    Source/PluginProcessor.cpp)
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp)
 target_include_directories(ProcessorTests PRIVATE Source)
 target_compile_definitions(ProcessorTests PRIVATE
     "JucePlugin_Name=\"Simple Delay\""

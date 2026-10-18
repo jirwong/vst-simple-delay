@@ -1,6 +1,6 @@
 #include "PluginProcessor.h"
 
-#include <juce_audio_utils/juce_audio_utils.h>
+#include "PluginEditor.h"
 
 juce::AudioProcessorValueTreeState::ParameterLayout SimpleDelayAudioProcessor::createParameterLayout()
 {
@@ -108,7 +108,7 @@ void SimpleDelayAudioProcessor::setStateInformation (const void* data, int sizeI
 
 juce::AudioProcessorEditor* SimpleDelayAudioProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor (*this);
+    return new SimpleDelayAudioProcessorEditor (*this);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
