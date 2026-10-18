@@ -47,3 +47,26 @@ set_target_properties(DelayLineTests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY         "${CMAKE_BINARY_DIR}/Tests"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/Tests"
     RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_BINARY_DIR}/Tests")
+
+# Offline tests for the plugin wrapper. This links the JUCE modules into a
+# second binary so PluginProcessor.cpp can be exercised directly (prepareToPlay
+# and processBlock) with no audio device and no host. JucePlugin_Name is defined
+# here because the plugin target's generated plugin defines are not inherited by
+# a console app.
+juce_add_console_app(ProcessorTests PRODUCT_NAME "ProcessorTests")
+target_sources(ProcessorTests PRIVATE
+    Tests/ProcessorTest.cpp
+    Source/PluginProcessor.cpp)
+target_include_directories(ProcessorTests PRIVATE Source)
+target_compile_definitions(ProcessorTests PRIVATE
+    "JucePlugin_Name=\"Simple Delay\""
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0)
+target_link_libraries(ProcessorTests PRIVATE
+    juce::juce_audio_utils
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags)
+set_target_properties(ProcessorTests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY         "${CMAKE_BINARY_DIR}/Tests"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/Tests"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_BINARY_DIR}/Tests")
