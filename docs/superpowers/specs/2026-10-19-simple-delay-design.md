@@ -298,10 +298,14 @@ never from `processBlock`.
 
 ### 6.4 Channel configurations
 
-`isBusesLayoutSupported` accepts mono or stereo input and output, and rejects
-anything else, so unsupported configurations fail loudly at load time rather than
-misbehaving during playback. Output-only (no input) configurations are not
-supported.
+`isBusesLayoutSupported` accepts mono or stereo input and mono or stereo output,
+with one restriction: the input may not have more channels than the output.
+
+- `{mono in, stereo out}` is **accepted**. Real hosts present this often, and it is
+  precisely the configuration §6.5's aliasing rule exists to handle.
+- `{stereo in, mono out}` is rejected rather than silently discarding a channel.
+- Anything else (multichannel, or no input at all) is rejected, so it fails loudly
+  at load time instead of misbehaving during playback.
 
 ### 6.5 Aliased input channels
 
@@ -328,7 +332,7 @@ device. Runs in under a second, and is the definition of "correct" for the DSP.
 | Test | Asserts |
 |---|---|
 | Impulse with a 100-sample delay | Non-zero output first appears at sample 100 |
-| Impulse, delay 100, feedback 0.5 | Echo amplitudes at 100/200/300 are 0.5/0.25/0.125 |
+| Impulse, delay 100, feedback 0.5 | Output at samples 100/200/300 is 1.0/0.5/0.25 (the 100-sample tap is the impulse itself; each later tap is the previous one times feedback) |
 | Impulse, delay 100.5 | Energy splits between samples 100 and 101 (interpolation) |
 | Feedback 0.95, 10 seconds of samples | Output stays finite and bounded, and decays |
 | `bufferData()` and `getBufferSize()` captured before and after 1000 `processSample` calls | Both unchanged — nothing allocates in the audio path |
