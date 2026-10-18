@@ -39,3 +39,11 @@ target_link_libraries(SimpleDelay PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+
+add_executable(DelayLineTests Tests/DelayLineTest.cpp)
+target_include_directories(DelayLineTests PRIVATE Source)
+target_compile_features(DelayLineTests PRIVATE cxx_std_17)
+set_target_properties(DelayLineTests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY         "${CMAKE_BINARY_DIR}/Tests"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/Tests"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_BINARY_DIR}/Tests")
