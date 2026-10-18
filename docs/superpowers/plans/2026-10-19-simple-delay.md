@@ -496,7 +496,7 @@ Same command as Step 5. Expected: `0 failures`, and the reported check count gro
 - [ ] **Step 12: Commit**
 
 ```bash
-git add CMakeLists.txt Tests/DelayLineTest.cpp Source/DelayLine.h
+git add CMakeLists.txt Tests/Check.h Tests/DelayLineTest.cpp Source/DelayLine.h
 git commit -m "Add DelayLine with integer delay, feedback, and clamping"
 ```
 
