@@ -2,6 +2,10 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "DelayLine.h"
+
+#include <vector>
+
 class SimpleDelayAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -15,7 +19,7 @@ public:
     {
     }
 
-    void prepareToPlay (double /*sampleRate*/, int /*samplesPerBlock*/) override {}
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
@@ -38,8 +42,8 @@ public:
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
-    void getStateInformation (juce::MemoryBlock& /*destData*/) override {}
-    void setStateInformation (const void* /*data*/, int /*sizeInBytes*/) override {}
+    void getStateInformation (juce::MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -48,5 +52,10 @@ public:
     static constexpr const char* mixID      = "mix";
 
 private:
+    std::vector<DelayLine> delayLines;
+    juce::SmoothedValue<float> timeSmoother;   // in samples, not ms
+    juce::SmoothedValue<float> mixSmoother;
+    double currentSampleRate = 44100.0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SimpleDelayAudioProcessor)
 };
