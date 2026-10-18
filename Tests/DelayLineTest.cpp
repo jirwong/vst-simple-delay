@@ -1,6 +1,7 @@
 #include "Check.h"
 #include "DelayLine.h"
 
+#include <algorithm>
 #include <vector>
 
 static constexpr double kSampleRate = 48000.0;
@@ -95,6 +96,69 @@ int main()
             line.processSample (0.1f);
         CHECK (line.bufferData() == before);
         CHECK (line.getBufferSize() == sizeBefore);
+    }
+
+    // --- a fractional delay splits energy across the two adjacent samples ---
+    {
+        DelayLine line;
+        line.prepare (kSampleRate, kMaxDelayMs);
+        line.setDelaySamples (100.5f);
+        line.setFeedback (0.0f);
+        auto out = impulseResponse (line, 300);
+
+        CHECK_NEAR (out[100], 0.5, 1e-3);
+        CHECK_NEAR (out[101], 0.5, 1e-3);
+        CHECK_NEAR (out[100] + out[101], 1.0, 1e-3);   // energy is preserved
+        CHECK_NEAR (out[99],  0.0, 1e-3);
+        CHECK_NEAR (out[102], 0.0, 1e-3);
+    }
+
+    // --- the delay is the same number of samples regardless of sample rate ---
+    {
+        DelayLine line;
+        line.prepare (96000.0, kMaxDelayMs);
+        line.setDelaySamples (1000.0f);
+        line.setFeedback (0.0f);
+        auto out = impulseResponse (line, 2000);
+
+        CHECK_NEAR (out[999],  0.0, 1e-9);
+        CHECK_NEAR (out[1000], 1.0, 1e-6);
+    }
+
+    // --- maximum feedback decays instead of running away ---
+    {
+        DelayLine line;
+        line.prepare (kSampleRate, kMaxDelayMs);
+        line.setDelaySamples (100.0f);
+        line.setFeedback (0.95f);
+
+        float peak = 0.0f, tail = 0.0f;
+        int nonFinite = 0;
+        const int total = (int) (kSampleRate * 10.0);   // ten seconds
+        for (int i = 0; i < total; ++i)
+        {
+            const float v = line.processSample (i == 0 ? 1.0f : 0.0f);
+            peak = std::max (peak, std::fabs (v));
+            tail = std::fabs (v);
+            if (! std::isfinite (v))
+                ++nonFinite;
+        }
+        CHECK (std::isfinite (peak));
+        CHECK (peak < 2.0f);
+        CHECK (tail < 1e-4f);
+        CHECK (nonFinite == 0);
+    }
+
+    // --- moving the delay time mid-run produces no NaN or infinity ---
+    {
+        DelayLine line;
+        line.prepare (kSampleRate, kMaxDelayMs);
+        line.setFeedback (0.5f);
+        for (int i = 0; i < 48000; ++i)
+        {
+            line.setDelaySamples (1.0f + (float) i);     // sweep across the whole range
+            CHECK (std::isfinite (line.processSample (0.5f)));
+        }
     }
 
     return reportAndExit();

@@ -33,8 +33,10 @@ public:
     float processSample (float input)
     {
         const float readIndexF = wrap ((float) writeIndex - delaySamples);
-        const int   i0  = (int) readIndexF;
-        const float out = buffer[(size_t) i0];
+        const int   i0   = (int) readIndexF;
+        const int   i1   = (i0 + 1) % bufferSize;
+        const float frac = readIndexF - (float) i0;
+        const float out  = buffer[(size_t) i0] + frac * (buffer[(size_t) i1] - buffer[(size_t) i0]);
         buffer[(size_t) writeIndex] = input + out * feedback;
         writeIndex = (writeIndex + 1) % bufferSize;
         return out;
