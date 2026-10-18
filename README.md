@@ -37,8 +37,10 @@ works as written.
 
 ## One-time JUCE setup
 
-Clone JUCE 8.0.15 into `libs/JUCE` (the VST3 SDK is a submodule, so submodules are
-cloned too; `libs/` is git-ignored):
+Clone JUCE 8.0.15 into `libs/JUCE` (`libs/` is git-ignored). The Steinberg VST3 SDK
+is vendored inside the JUCE repository, so nothing else needs fetching; the
+`--recurse-submodules --shallow-submodules` flags are defensive no-ops as of
+8.0.15:
 
 ```bash
 git clone --depth 1 --branch 8.0.15 --recurse-submodules --shallow-submodules https://github.com/juce-framework/JUCE.git libs/JUCE
@@ -119,7 +121,7 @@ Source/
 Tests/
   Check.h                       shared test macros: CHECK, CHECK_NEAR, and
                                 reportAndExit().
-  DelayLineTest.cpp             offline DSP tests; includes DelayLine.h only.
+  DelayLineTest.cpp             offline DSP tests; no JUCE or plugin includes.
   ProcessorTest.cpp             offline plugin-wrapper tests; includes
                                 PluginProcessor.h.
 ```
