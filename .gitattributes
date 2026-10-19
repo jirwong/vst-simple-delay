@@ -1,0 +1,5 @@
+# core.autocrlf is true on this machine, which would check out shell scripts with
+# CRLF line endings and break them (`bash\r`: command not found). Pin the two
+# cases where the line ending actually matters.
+*.sh  text eol=lf
+*.bat text eol=crlf
