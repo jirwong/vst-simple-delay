@@ -244,9 +244,10 @@ Host-provided bypass is used; no bypass parameter is created.
 
 `processBlock(buffer, midi)`:
 - `juce::ScopedNoDenormals` at the top of the function
-- clears output channels beyond the number of input channels (JUCE aliases
-  absent input channels to the output buffer; without this, stereo-out/mono-in
-  hosts hear stale data in one channel)
+- clears output channels beyond the number of input channels: JUCE guarantees
+  sensible data only in channels that correspond to an input, and states the
+  others "may contain garbage", so they must be overwritten or cleared. Without
+  this, a stereo-out/mono-in host passes that garbage to one speaker.
 - reads the three parameter values **once per block** from raw atomics
 - sets smoother targets
 - for each sample, for each channel: advance the smoothers, apply
@@ -304,22 +305,34 @@ never from `processBlock`.
 with one restriction: the input may not have more channels than the output.
 
 - `{mono in, stereo out}` is **accepted**. Real hosts present this often, and it is
-  precisely the configuration §6.5's aliasing rule exists to handle.
+  precisely the configuration §6.5's clearing rule exists to handle.
 - `{stereo in, mono out}` is rejected rather than silently discarding a channel.
 - Anything else (multichannel, or no input at all) is rejected, so it fails loudly
   at load time instead of misbehaving during playback.
 
-### 6.5 Aliased input channels
+### 6.5 Output channels with no input
 
 Covered in §5.2: output channels with no corresponding input channel must be
-explicitly cleared.
+explicitly cleared. JUCE's contract is not that such channels alias anything —
+it is that only channels corresponding to an input are guaranteed sensible, and
+the rest may hold garbage that must not be passed through.
 
-### 6.6 Delay time beyond the buffer
+### 6.6 Tail length
+
+`getTailLengthSeconds` returns `std::numeric_limits<double>::infinity()`. A
+feedback delay's tail is unbounded in principle, and hosts that honour tail
+information use it to decide how long to keep rendering after the input stops —
+reporting zero (the framework's default) makes them truncate offline renders at
+the end of the material, cutting the final echoes dead. JUCE maps only a genuine
+infinity to the VST3 infinite-tail flag; any finite value is read as a sample
+count, so a large number would be misinterpreted.
+
+### 6.7 Delay time beyond the buffer
 
 `DelayLine` clamps any requested delay to the buffer's usable range, so an
 out-of-range value from automation cannot read outside the buffer.
 
-### 6.7 State restore across versions
+### 6.8 State restore across versions
 
 Not a concern in v1; parameter IDs are chosen to be stable strings so saved
 projects keep working in later versions.

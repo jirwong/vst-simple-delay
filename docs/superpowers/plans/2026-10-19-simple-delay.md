@@ -30,7 +30,7 @@
 
 Failure modes the spec implies but no single task's tests obviously cover. Each is pinned by a test in the task that owns the code:
 
-1. **Mono input, stereo output** — the host aliases the absent input channel to the output buffer, so an unchecked plugin emits stale buffer contents (or last pass's audio) in the right channel. Expected: right channel is silent. Test in Task 5; the clearing code is Task 4.
+1. **Mono input, stereo output** — JUCE guarantees sensible data only in output channels that correspond to an input channel, and documents that the others "may contain garbage"; an unchecked plugin passes that garbage to the right speaker. Note this is *not* aliasing, which is the explanation this plan originally gave. Expected: right channel is silent. Test in Task 5; the clearing code is Task 4.
 2. **Delay time driven out of range by automation** — a host curve can push `time` to its extremes or a host can hand back a sample count beyond the buffer. Expected: the read position stays inside the buffer. Tests in Task 2.
 3. **Feedback at its maximum with a continuous input** — the loop must stay bounded at 0.95 rather than grow. Test in Task 3.
 4. **The host calls `prepareToPlay` again at a different sample rate** — the delay must still be the requested number of milliseconds, and stale audio must not survive. Tests in Task 3 (96 kHz) and Task 5 (re-prepare).
@@ -684,7 +684,8 @@ const int numIn      = getTotalNumInputChannels();
 const int numOut     = getTotalNumOutputChannels();
 const int numSamples = buffer.getNumSamples();
 
-// Channels with no input channel aliased to them hold stale data. Clear them.
+// Output channels with no corresponding input channel are not guaranteed to hold
+// sensible data ("may contain garbage"), so clear them.
 for (int ch = numIn; ch < numOut; ++ch)
     buffer.clear (ch, 0, numSamples);
 
@@ -741,6 +742,8 @@ void SimpleDelayAudioProcessor::setStateInformation (const void* data, int sizeI
 
 Do **not** call `setLatencySamples`. Reporting the delay as latency would make the host compensate for it and cancel the effect.
 
+Add `getTailLengthSeconds()` returning `std::numeric_limits<double>::infinity()` (spec §6.6), with a comment saying why: a feedback delay's tail is unbounded in principle, and JUCE maps only a genuine infinity to the VST3 infinite-tail flag — a finite value is read as a sample count. This was **not** in the original plan; it was added by the final review, which found the framework's default of `0.0` telling hosts to truncate offline renders.
+
 - [ ] **Step 5: Build and confirm the DSP tests still pass**
 
 ```bash
@@ -774,7 +777,7 @@ git commit -m "Wire delay line into processBlock with parameter smoothing"
 
 The DSP is proven; this proves the wrapper. It pins the three failure modes that only exist at the plugin level: mono-in/stereo-out silence, repeated `prepareToPlay`, and state round-trip.
 
-This task adds a JUCE-linked console app. It is an addition to spec §7, which only specified offline tests for `DelayLine` — the spec's success criteria 5 (state restores) and §6.5 (aliased channels) would otherwise rest on manual testing alone.
+This task adds a JUCE-linked console app. It is an addition to spec §7, which only specified offline tests for `DelayLine` — the spec's success criteria 5 (state restores) and §6.5 (output channels with no input) would otherwise rest on manual testing alone.
 
 **Files:**
 - Create: `Tests/ProcessorTest.cpp`
@@ -1008,8 +1011,9 @@ git commit -m "Document build, install, testing, and FL Studio verification"
 | §6.2 denormals | Task 4 Step 3 (`ScopedNoDenormals`), Task 3 Step 6 (decays) |
 | §6.3 sample-rate changes | Task 3 Step 5, Task 5 Step 2 |
 | §6.4 channel configurations | Task 1 Step 7 |
-| §6.5 aliased input channels | Task 5 Step 2 |
-| §6.6 delay beyond buffer | Task 2 Step 8 |
+| §6.5 output channels with no input | Task 5 Step 2 |
+| §6.6 tail length | Final review fix wave (getTailLengthSeconds returns infinity; pinned by `Tests/ProcessorTest.cpp`) |
+| §6.7 delay beyond buffer | Task 2 Step 8 |
 | §7.1 offline DSP tests | Tasks 2 and 3 (all seven) |
 | §7.2 in-host verification | Task 7 Step 3 |
 | §7.3 build verification | Task 1 Steps 9–10 |
