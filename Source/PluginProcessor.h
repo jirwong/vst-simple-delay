@@ -35,10 +35,11 @@ public:
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    // Feedback means the tail is unbounded in principle, so report the
-    // infinite-tail convention; returning 0 would let hosts truncate offline
-    // renders at the end of the material and cut the echoes dead.
-    double getTailLengthSeconds() const override { return std::numeric_limits<double>::max(); }
+    // A feedback delay's tail is unbounded in principle, so report a genuine
+    // infinity: JUCE maps only an infinite value to the VST3 infinite-tail
+    // flag, while a large finite value is read as a sample count (and so would
+    // still let hosts truncate offline renders and cut the echoes dead).
+    double getTailLengthSeconds() const override { return std::numeric_limits<double>::infinity(); }
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }

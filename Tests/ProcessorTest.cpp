@@ -204,6 +204,12 @@ int main()
         measureEcho (144000, 150000);
     }
 
+    // --- a feedback delay must report an infinite tail, not "no tail" ---
+    {
+        SimpleDelayAudioProcessor p;
+        CHECK (std::isinf (p.getTailLengthSeconds()));
+    }
+
     // --- state round-trip: save on one processor, restore on a fresh one ---
     {
         SimpleDelayAudioProcessor a;

@@ -52,9 +52,11 @@ public:
         // (input + out * feedback) is what turns one tap into an unending echo.
         const float readIndexF = wrap ((float) writeIndex - delaySamples);
         const int   i0   = (int) readIndexF;
-        // i0 + 1 is the read head's closest approach to the write head, and at
-        // that point it *is* the write index. When the write index has wrapped
-        // to 0, i0 + 1 equals bufferSize, so it needs wrapping too.
+        // i0 can be the buffer's final slot whenever the fractional read
+        // position lands there, for any write index, so i0 + 1 can reach
+        // bufferSize and must wrap. At the closest approach (delay exactly 1.0)
+        // i0 is the slot before the write head, which is the case that matters:
+        // i1 is then the write index itself.
         const int   i1   = (i0 + 1) % bufferSize;
         const float frac = readIndexF - (float) i0;
         const float out  = buffer[(size_t) i0] + frac * (buffer[(size_t) i1] - buffer[(size_t) i0]);
