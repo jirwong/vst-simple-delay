@@ -65,6 +65,28 @@ from an ordinary shell rather than a `vcvars` one.
 cmake --build build --config Release --parallel
 ```
 
+### Build scripts
+
+`build.sh` (git bash) and `build.bat` (cmd, PowerShell, or double-click) wrap the
+configure-and-build steps. Both locate CMake themselves — including the Build
+Tools copy that is not on `PATH` — configure the tree automatically if
+`build/CMakeCache.txt` is missing, and pass `--parallel` through:
+
+```bash
+./build.sh          # build (Release)
+./build.sh --test   # build, then run both offline test suites
+```
+
+```bat
+build.bat
+build.bat test
+```
+
+Neither script clones JUCE: if `libs/JUCE` is missing they print the clone
+command and exit non-zero rather than starting a 1–2 GB download as a side
+effect. They are conveniences over the raw commands above, not a replacement;
+the commands are what you should reach for when something goes wrong.
+
 ## Build artefacts
 
 After a successful build:
